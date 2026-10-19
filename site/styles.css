@@ -4,7 +4,7 @@
 .header .brand{gap:15px}.header .brand img{width:52px;height:52px;border-radius:12px}.header .brand>span{font-size:23px}.header .brand small{font-size:8px;letter-spacing:2.6px}
 .brand-art{border:0;border-radius:0;aspect-ratio:.92;background:radial-gradient(ellipse at 50% 45%,#d9a84e10,transparent 65%);box-shadow:none;padding:32px 0 0;isolation:isolate;overflow:visible;align-items:center;justify-content:center}
 .brand-art:before{inset:3% -10% 13%;border:0;border-radius:50%;background:radial-gradient(ellipse,#59432e28,transparent 65%);filter:blur(15px)}
-.hero-emblem{position:relative;width:92%;height:auto;display:block;z-index:2;border-radius:22%;box-shadow:0 24px 80px #0008,0 0 65px #d9a84e09;transform:rotate(-4deg)}
+.hero-emblem{position:relative;width:92%;height:auto;display:block;z-index:2;border-radius:22%;box-shadow:0 24px 80px #0008,0 0 65px #d9a84e09;transform:none}
 .brand-orbit{position:absolute;z-index:1;border:1px solid #d9a84e30;border-radius:50%;width:110%;height:52%;left:-5%;top:21%;transform:rotate(-34deg)}
 .orbit-two{width:96%;height:104%;top:-2%;left:2%;transform:rotate(33deg);border-color:#d9a84e14}
 .orbit-star{position:absolute;color:#e8c889;z-index:3;text-shadow:0 0 30px #e8c88980}.star-one{top:10%;right:3%;font-size:38px}.star-two{bottom:18%;left:0;font-size:26px}
