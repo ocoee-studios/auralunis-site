@@ -35,7 +35,7 @@ Features and free/Lifetime messaging were checked against the public App Store l
 - https://github.com/ocoee-studios/Auralunis/blob/main/README.md
 - https://github.com/ocoee-studios/Auralunis/blob/main/src/theme/tokens.ts
 
-The celestial dial is explicitly an artistic illustration, not a screenshot or live sky chart. The feature switcher is a website tour, not an astronomy calculator. No location is requested. Pricing is deferred to the App Store so regional prices remain correct.
+The hero uses the original high-resolution AuraLunis gold Moon-and-compass logo, framed by decorative orbits. It is brand artwork, not a screenshot or live sky chart. The feature switcher is a website tour, not an astronomy calculator. No location is requested. Pricing is deferred to the App Store so regional prices remain correct.
 
 The footer uses the app's existing privacy policy and Apple's standard EULA, matching the App Store's destinations. **Content follow-up:** the separate `auralunis-legal` privacy page still mentions camera AR, while the current app and App Store describe a rendered planetarium with no camera use. That existing policy should be reconciled separately; this website does not modify it.
 
