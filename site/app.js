@@ -1,4 +1,6 @@
 "use strict";
+function initializeAuraLunis(){
+"use strict";
 const features = {
   see: {symbol:"✧",kicker:"A PLANETARIUM IN YOUR POCKET",title:"Turn ‘what is that?’ into a discovery.",copy:"Move your iPhone to explore a rendered sky aligned with your direction. Browse at your own pace in Manual Sky Map, or use Find Mode to seek out a celestial target.",foot:"Sky Lens uses location and motion sensors. No camera overlay."},
   plan: {symbol:"☾",kicker:"A LITTLE PLANNING. A LOT OF WONDER.",title:"Give tonight a reason to look up.",copy:"Check Tonight Score for a sense of stargazing conditions, explore observing forecasts in Astro Weather, and browse the Celestial Calendar for events that catch your curiosity.",foot:"Conditions and visibility vary by location. Forecasts are estimates."},
@@ -34,3 +36,6 @@ document.querySelectorAll('a[href^="#"]').forEach(link => {
     target.focus({preventScroll: true});
   });
 });
+
+}
+if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",initializeAuraLunis,{once:true});}else{initializeAuraLunis();}

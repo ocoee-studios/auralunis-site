@@ -46,3 +46,7 @@ JavaScript syntax, keyboard feature-tour behavior using a minimal DOM harness, l
 ## Ownership
 
 Website copy, app artwork, and branding belong to Ocoee Studios LLC. Asset originals are retained in the app repository. No generated or third-party stock images were added.
+
+## Screens and TV support
+
+Required across phones, tablets, computers, and TV browsers. See [responsive acceptance checks](deploy/RESPONSIVE.md). Large-display scaling and narrow-screen safeguards are included; the actual browser/TV test matrix remains a release check.
