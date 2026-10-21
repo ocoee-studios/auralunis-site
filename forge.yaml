@@ -1,0 +1,37 @@
+# Forge app config for this repo. See alexbradshaw5/infrastructure docs/CONFIG.md and the
+# forge-deploy skill. Modelled on ocoee-studios/website (the ocoeestudios app).
+#
+# A static marketing site: nginx (non-root) over site/, no build step, no database, no secrets.
+
+apiVersion: forge/v1
+kind: App
+name: auralunis
+description: The official Auralunis marketing website by Ocoee Studios LLC, static HTML served by nginx.
+
+# Only production. A marketing site has no staging to promote from, and declaring one would
+# invite a placement nobody planned.
+environments: [production]
+
+services:
+  - name: web
+    # The repo root: the Containerfile copies deploy/nginx.conf and site/, both relative to it.
+    context: .
+    dockerfile: Containerfile
+    # 8080, and three places must agree: `listen 8080` in deploy/nginx.conf, `EXPOSE 8080` in
+    # the Containerfile, and here. nginx runs as the nginx user, so it cannot bind below 1024.
+    port: 8080
+    # A public website: routed through the production environment's Cloudflare tunnel.
+    ingress: true
+    health:
+      # nginx answers /healthz with a plain 200 "ok" (deploy/nginx.conf). It is a real route,
+      # so a misrouted request that redirects cannot pass the gate.
+      http: /healthz
+      # nginx is up within a second; a long start period would only slow a blue/green swap.
+      startPeriodSeconds: 5
+      intervalSeconds: 10
+
+# Nothing: every value the site renders is in the static files.
+env: {}
+
+# None: no API key, database or session secret.
+secrets: []
