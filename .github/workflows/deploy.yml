@@ -1,0 +1,133 @@
+# Every push to main is a production deploy of auralunis (auralunis.com and www.auralunis.com).
+#
+# Modelled on ocoee-studios/website's deploy job. There is no build or test step: the site is
+# static files that nginx serves as they are, and `forge up` gates the new slot on /healthz
+# before any traffic moves to it.
+#
+# Third-party actions are pinned to a commit SHA, not a tag: a tag can be repointed by its owner,
+# a SHA cannot. The trailing comment says which version it is.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+# Read-only token: the job needs to check the repo out and nothing else.
+permissions:
+  contents: read
+
+# Never cancel a deploy midway (that could stop it between starting the new slot and moving
+# traffic to it), and never run two at once: two `forge up`s for the same app would race over
+# the same blue/green pair.
+concurrency:
+  group: deploy-auralunis-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # A self-hosted runner on the forge production box (prod-vps), registered to this repo only,
+    # running as the unprivileged `ghrunner` account behind the `ghrunner_guard` egress table.
+    # Its job-started hook refuses every job that is not a push to main running this file, so a
+    # pull request (including one from a fork) can never run code on the box.
+    #
+    # There is no deploy secret in GitHub: `forge up` connects to 127.0.0.1 as `forge-production`
+    # with a key that exists only on the box, in the runner account's home.
+    runs-on: [self-hosted, ocoee]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # `forge up` ships the build context with `git archive <ref>`; depth 1 carries the
+          # commit being deployed.
+          fetch-depth: 1
+          persist-credentials: false
+
+      # Build the image on the box, start it in the idle slot, health-check that slot, and only
+      # then swap Caddy to it. A build that comes up broken never receives a request, and the
+      # serving slot is never touched. Re-running with nothing changed deploys nothing.
+      #
+      # `flock`: the three Ocoee app-site runners share one lock (same account, same file), so
+      # their deploys to the production environment run one after another, never together.
+      - name: forge up
+        run: |
+          flock --wait 1200 "$HOME/.ocoee-sites-deploy.lock" \
+            forge up \
+              --box 127.0.0.1 \
+              --port 50000 \
+              --user forge-production \
+              --identity "$HOME/.ssh/forge-production-local" \
+              --env production \
+              --config forge.yaml \
+              --ref "$GITHUB_SHA" \
+              --actor "github-actions:$GITHUB_ACTOR"
+
+      # The health gate proves the slot answers /healthz. This asks what it cannot: does the path
+      # the public names take (tunnel -> forge edge -> this app's Caddy -> live slot) serve THIS
+      # commit's page?
+      #
+      # It cannot ask through Cloudflare, which bot-challenges scripted requests from this box,
+      # and the runner's egress guard blocks every local port except SSH 50000. So the check rides
+      # the SSH login `forge up` already uses and asks from there, as `forge-production`:
+      #   1. the live slot, from this app's Caddy upstream file;
+      #   2. the edge port the tunnel config routes both public names to (one port, both names);
+      #   3. for both names, through that edge port: HTTP 200, the same <title> as this commit's
+      #      site/index.html, and a body whose sha256 equals that file's;
+      #   4. the request (tagged with this run's id) shows up in the live slot's container log.
+      - name: Verify both names serve this commit
+        env:
+          APP: auralunis
+          HOSTS: auralunis.com www.auralunis.com
+        run: |
+          want_sum=$(sha256sum site/index.html | cut -d' ' -f1)
+          want_title=$(grep -o '<title>[^<]*</title>' site/index.html | head -n1)
+          [ -n "$want_title" ] || { echo "site/index.html has no <title>"; exit 1; }
+          marker="deploy-check-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "expect title: $want_title"
+          echo "expect sha256: $want_sum"
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -p 50000 \
+              -i "$HOME/.ssh/forge-production-local" forge-production@127.0.0.1 \
+              bash -s -- "$APP" "$want_sum" "$(printf '%s' "$want_title" | base64 -w0)" "$marker" $HOSTS <<'EOF'
+          set -eu
+          # The title travels base64-encoded: ssh joins its arguments into one remote command
+          # line, and a title holds spaces and entities like &amp;.
+          app=$1 want_sum=$2 want_title=$(printf '%s' "$3" | base64 -d) marker=$4
+          shift 4
+          export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+          base=/opt/forge/production
+
+          live=$(grep -oE "to $app-web-(blue|green):" "$base/caddy/upstreams/$app-web.conf" | sed -E 's/^to [a-z0-9-]+-(blue|green):$/\1/' | sort -u)
+          [ "$live" = blue ] || [ "$live" = green ] || { echo "cannot tell the live slot from $app-web.conf: '$live'"; exit 1; }
+          echo "live slot: $live"
+
+          edge=
+          for host in "$@"; do
+            port=$( { grep -A1 -hxF "  - hostname: $host" "$base"/cloudflared/*.yml || true
+                      grep -A1 -hxF "  - hostname: \"*.${host#*.}\"" "$base"/cloudflared/*.yml || true; } \
+                    | sed -nE 's#^    service: http://127\.0\.0\.1:([0-9]+)$#\1#p' | head -n1)
+            [ -n "$port" ] || { echo "the tunnel config routes $host nowhere"; exit 1; }
+            [ -z "$edge" ] || [ "$edge" = "$port" ] || { echo "$host goes to :$port, another name to :$edge"; exit 1; }
+            edge=$port
+            echo "tunnel routes $host to :$port"
+          done
+
+          for host in "$@"; do
+            ok=
+            for i in 1 2 3 4 5; do
+              tmp=$(mktemp)
+              code=$(curl -s -o "$tmp" -w '%{http_code}' --max-time 20 -H "Host: $host" "http://127.0.0.1:$edge/?$marker") || code=000
+              sum=$(sha256sum "$tmp" | cut -d' ' -f1)
+              title=$(grep -o '<title>[^<]*</title>' "$tmp" | head -n1 || true)
+              rm -f "$tmp"
+              echo "$host attempt $i: HTTP $code, sha256 $sum, $title"
+              if [ "$code" = 200 ] && [ "$sum" = "$want_sum" ] && [ "$title" = "$want_title" ]; then ok=1; break; fi
+              sleep 10
+            done
+            [ -n "$ok" ] || { echo "$host did not serve this commit's page"; exit 1; }
+          done
+
+          sleep 2
+          seen=$(podman logs --since 10m "$app-web-$live" 2>&1 | grep -cF "$marker" || true)
+          echo "requests tagged $marker in $app-web-$live's log: $seen"
+          [ "$seen" -ge 2 ] || { echo "the check's requests did not reach the live slot $live"; exit 1; }
+          echo "OK: $* serve this commit from $live"
+          EOF
