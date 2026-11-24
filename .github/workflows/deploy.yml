@@ -50,7 +50,7 @@ jobs:
       # their deploys to the production environment run one after another, never together.
       - name: forge up
         run: |
-          flock --wait 2400 "$HOME/.ocoee-sites-deploy.lock" \
+          flock --wait 1200 "$HOME/.ocoee-sites-deploy.lock" \
             forge up \
               --box 127.0.0.1 \
               --port 50000 \
